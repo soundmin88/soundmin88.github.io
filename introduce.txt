@@ -1,0 +1,26 @@
+# 개발자 포트폴리오 자기소개
+
+## 기본 정보
+- **이름:** 김태우 (Tae-woo Kim)
+- **직군:** 풀스택 웹 개발자 (Full Stack Web Developer)
+- **이메일:** dev.taewoo@example.com
+- **Github:** https://github.com/taewoo-dev
+
+## 자기소개
+안녕하세요! 사용자 경험을 최우선으로 생각하는 5년 차 풀스택 개발자 김태우입니다.
+
+저는 "기술은 사람을 위해 존재한다"는 믿음을 바탕으로, 복잡한 문제를 직관적이고 효율적인 코드로 해결하는 것에 열정을 가지고 있습니다. JavaScript 생태계(React, Node.js)를 주무기로 삼고 있으며, 최근에는 Python과 TensorFlow를 활용한 AI 모델의 웹 서비스 통합에 깊은 관심을 두고 학습하고 있습니다.
+
+단순히 기능이 동작하는 것을 넘어, 유지보수가 용이하고 확장 가능한 아키텍처를 설계하는 것을 중요하게 생각합니다. 동료와의 원활한 커뮤니케이션과 코드 리뷰 문화를 사랑하며, 함께 성장하는 개발 팀을 지향합니다.
+
+## 기술 스택 (Tech Stack)
+- **Frontend:** React, TypeScript, Next.js, Tailwind CSS
+- **Backend:** Node.js, Express, NestJS, Python (Django/FastAPI)
+- **Database:** PostgreSQL, MongoDB, Redis
+- **DevOps:** Docker, AWS (EC2, S3, RDS), GitHub Actions
+
+## 주요 프로젝트 경험
+1. **E-commerce 플랫폼 리팩토링 (2024)**: 레거시 시스템을 MSA(Microservices Architecture)로 전환하여 트래픽 처리 성능 30% 향상
+2. **사내 업무 자동화 봇 개발 (2023)**: 반복적인 업무를 줄이기 위해 Slack 연동 챗봇 개발, 업무 효율 20% 증대
+
+새로운 기술에 대한 호기심을 잃지 않고 끊임없이 도전하는 개발자가 되겠습니다. 감사합니다.
