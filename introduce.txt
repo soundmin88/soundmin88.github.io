@@ -3,11 +3,11 @@
 ## 기본 정보
 - **이름:** 강성민 (Kang Seongmin)
 - **직군:** 풀스택 웹 개발자 (Full Stack Web Developer)
-- **이메일:** dev.taewoo@example.com
-- **Github:** https://github.com/taewoo-dev
+- **이메일:** dev.seongmin@example.com
+- **Github:** https://github.com/seongmin-dev
 
 ## 자기소개
-안녕하세요! 사용자 경험을 최우선으로 생각하는 5년 차 풀스택 개발자 김태우입니다.
+안녕하세요! 사용자 경험을 최우선으로 생각하는 5년 차 풀스택 개발자 강성민입니다.
 
 저는 "기술은 사람을 위해 존재한다"는 믿음을 바탕으로, 복잡한 문제를 직관적이고 효율적인 코드로 해결하는 것에 열정을 가지고 있습니다. JavaScript 생태계(React, Node.js)를 주무기로 삼고 있으며, 최근에는 Python과 TensorFlow를 활용한 AI 모델의 웹 서비스 통합에 깊은 관심을 두고 학습하고 있습니다.
 
