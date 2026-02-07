@@ -1,7 +1,7 @@
 # 개발자 포트폴리오 자기소개
 
 ## 기본 정보
-- **이름:** 김태우 (Tae-woo Kim)
+- **이름:** 강성민 (Kang Seongmin)
 - **직군:** 풀스택 웹 개발자 (Full Stack Web Developer)
 - **이메일:** dev.taewoo@example.com
 - **Github:** https://github.com/taewoo-dev
