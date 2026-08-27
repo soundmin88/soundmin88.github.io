@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>설비 마스터 조회 - 컴퓨터 시스템 통합 마스터 관리 시스템</title>
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">컴퓨터 시스템 통합 마스터 관리 시스템</div>
+  <nav>
+    <a href="dashboard.html">대시보드</a>
+    <a href="master-list.html" class="active">설비 마스터</a>
+    <a href="admin-users.html" id="admin-link" style="display:none;">사용자 관리</a>
+  </nav>
+  <div class="user-box">
+    <span id="user-info">불러오는 중...</span>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="page-header" style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h2>설비 마스터 조회</h2>
+      <p>설비번호, 설비명, 팀/파트, 위치로 검색할 수 있습니다.</p>
+    </div>
+    <div id="admin-actions" style="display:none;">
+      <a href="master-form.html" class="btn" style="width:auto; display:inline-flex;">+ 새 설비 등록</a>
+      <a href="master-upload.html" class="btn btn-secondary" style="width:auto; display:inline-flex; margin-left:8px;">일괄 업로드</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="설비번호, 설비명, 팀, 파트, 위치로 검색" />
+      <select id="status-filter">
+        <option value="">전체 상태</option>
+        <option value="운영설비">운영설비</option>
+        <option value="불용설비">불용설비</option>
+        <option value="폐기설비">폐기설비</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" id="search-btn" style="width:auto;">검색</button>
+    </div>
+
+    <div class="result-count" id="result-count"></div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr id="table-head"></tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div id="empty-state" class="empty-state" style="display:none;">검색 결과가 없습니다.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/master-fields.js"></script>
+<script>
+  const LIST_LABELS = { equipment_no: "설비번호", equipment_name: "설비명", team: "팀", part: "파트", location: "설비위치", equipment_grade: "등급", equipment_status: "상태" };
+
+  document.getElementById("table-head").innerHTML =
+    MASTER_LIST_FIELDS.map((k) => `<th>${LIST_LABELS[k]}</th>`).join("") + "<th></th>";
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : str;
+    return div.innerHTML;
+  }
+
+  function statusBadgeClass(status) {
+    if (!status) return "badge-user";
+    if (status.includes("운영")) return "badge-approved";
+    if (status.includes("불용")) return "badge-pending";
+    if (status.includes("폐기")) return "badge-rejected";
+    return "badge-user";
+  }
+
+  async function search() {
+    const q = document.getElementById("search-input").value.trim();
+    const statusFilter = document.getElementById("status-filter").value;
+
+    let query = supabaseClient.from("equipment_master").select("*").order("team").order("equipment_name").limit(300);
+
+    if (q) {
+      const like = `%${q}%`;
+      query = query.or(
+        `equipment_no.ilike.${like},equipment_name.ilike.${like},team.ilike.${like},part.ilike.${like},location.ilike.${like}`
+      );
+    }
+    if (statusFilter) {
+      query = query.ilike("equipment_status", `%${statusFilter}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error(error);
+      alert("조회 중 오류가 발생했습니다.");
+      return;
+    }
+    render(data);
+  }
+
+  function render(rows) {
+    const tbody = document.getElementById("table-body");
+    const emptyState = document.getElementById("empty-state");
+    document.getElementById("result-count").textContent = `${rows.length}건 (최대 300건까지 표시됩니다)`;
+
+    if (rows.length === 0) {
+      tbody.innerHTML = "";
+      emptyState.style.display = "block";
+      return;
+    }
+    emptyState.style.display = "none";
+
+    tbody.innerHTML = rows.map((row) => {
+      const cells = MASTER_LIST_FIELDS.map((k) => {
+        if (k === "equipment_status") {
+          return `<td><span class="badge ${statusBadgeClass(row[k])}">${escapeHtml(row[k])}</span></td>`;
+        }
+        return `<td>${escapeHtml(row[k])}</td>`;
+      }).join("");
+      return `<tr>${cells}<td><a href="master-form.html?id=${row.id}">상세</a></td></tr>`;
+    }).join("");
+  }
+
+  document.getElementById("search-btn").addEventListener("click", search);
+  document.getElementById("search-input").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+  document.getElementById("status-filter").addEventListener("change", search);
+
+  (async () => {
+    const profile = await requireApprovedUser();
+    if (!profile) return;
+    document.getElementById("user-info").textContent =
+      `${profile.name || profile.email} · ${profile.department || "-"} · ${ROLE_LABEL[profile.role]}`;
+    if (profile.role === "admin") {
+      document.getElementById("admin-link").style.display = "inline";
+      document.getElementById("admin-actions").style.display = "block";
+    }
+    await search();
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>설비 마스터 업로드 - 컴퓨터 시스템 통합 마스터 관리 시스템</title>
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">컴퓨터 시스템 통합 마스터 관리 시스템</div>
+  <nav>
+    <a href="dashboard.html">대시보드</a>
+    <a href="master-list.html">설비 마스터</a>
+    <a href="admin-users.html" id="admin-link" style="display:none;">사용자 관리</a>
+  </nav>
+  <div class="user-box">
+    <span id="user-info">불러오는 중...</span>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h2>설비 마스터 일괄 업로드</h2>
+    <p>엑셀에서 헤더를 포함해 표 전체를 복사(Ctrl/Cmd+C)한 뒤 아래에 붙여넣어주세요. 설비번호가 이미 있으면 내용이 갱신되고, 없으면 새로 등록됩니다.</p>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <div class="card">
+    <div class="field">
+      <label for="paste-area">엑셀 데이터 붙여넣기 (헤더 행 포함)</label>
+      <textarea id="paste-area" rows="10" placeholder="순번	팀	파트	설비위치	...(엑셀에서 그대로 복사한 표를 여기 붙여넣으세요)"></textarea>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-secondary" id="preview-btn" style="width:auto;">미리보기</button>
+      <button class="btn" id="upload-btn" style="width:auto; display:none;">업로드 실행</button>
+    </div>
+  </div>
+
+  <div class="card" id="preview-card" style="display:none; margin-top:20px;">
+    <h3 style="margin-top:0; font-size:15px;">미리보기</h3>
+    <div id="preview-summary" class="result-count"></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr id="preview-head"></tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/master-fields.js"></script>
+<script>
+  let parsedRows = [];
+  const messageBox = document.getElementById("message");
+
+  function showMessage(text, type) {
+    messageBox.textContent = text;
+    messageBox.className = "message show " + type;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : str;
+    return div.innerHTML;
+  }
+
+  function parsePastedData(text) {
+    const lines = text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "");
+    if (lines.length < 2) {
+      throw new Error("헤더 행과 데이터가 최소 1행 이상 필요합니다.");
+    }
+
+    const headers = lines[0].split("\t").map((h) => h.trim());
+    const labelToKey = {};
+    MASTER_FIELDS.forEach((f) => { labelToKey[f.label] = f.key; });
+
+    const columnMap = headers.map((h) => labelToKey[h] || null);
+
+    if (!columnMap.includes("equipment_no")) {
+      throw new Error('헤더에서 "설비번호" 컬럼을 찾을 수 없습니다. 첫 줄에 컬럼명이 포함된 헤더 행이 있는지 확인해주세요.');
+    }
+
+    const rows = [];
+    const skipped = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split("\t");
+      const row = {};
+      columnMap.forEach((key, idx) => {
+        if (!key) return;
+        const value = (cells[idx] || "").trim();
+        row[key] = value === "" || value === "N/A" ? null : value;
+      });
+
+      if (!row.equipment_no) {
+        skipped.push(i + 1);
+        continue;
+      }
+      rows.push(row);
+    }
+
+    return { rows, skipped, unmatchedHeaders: headers.filter((h, idx) => h && !columnMap[idx]) };
+  }
+
+  document.getElementById("preview-btn").addEventListener("click", () => {
+    messageBox.className = "message";
+    try {
+      const { rows, skipped, unmatchedHeaders } = parsePastedData(document.getElementById("paste-area").value);
+      parsedRows = rows;
+
+      let summary = `${rows.length}건 인식됨`;
+      if (skipped.length) summary += ` · 설비번호 없어 제외된 행: ${skipped.length}건 (${skipped.join(", ")}행)`;
+      if (unmatchedHeaders.length) summary += ` · 인식 못한 컬럼(무시됨): ${unmatchedHeaders.join(", ")}`;
+      document.getElementById("preview-summary").textContent = summary;
+
+      document.getElementById("preview-head").innerHTML =
+        MASTER_LIST_FIELDS_UPLOAD.map((k) => `<th>${MASTER_FIELDS.find((f) => f.key === k).label}</th>`).join("");
+      document.getElementById("preview-body").innerHTML = rows.slice(0, 10).map((row) =>
+        `<tr>${MASTER_LIST_FIELDS_UPLOAD.map((k) => `<td>${escapeHtml(row[k])}</td>`).join("")}</tr>`
+      ).join("") + (rows.length > 10 ? `<tr><td colspan="${MASTER_LIST_FIELDS_UPLOAD.length}" style="color:var(--color-text-muted);">... 외 ${rows.length - 10}건</td></tr>` : "");
+
+      document.getElementById("preview-card").style.display = "block";
+      document.getElementById("upload-btn").style.display = rows.length ? "inline-flex" : "none";
+
+      if (rows.length === 0) {
+        showMessage("업로드할 유효한 행이 없습니다.", "error");
+      }
+    } catch (err) {
+      document.getElementById("preview-card").style.display = "none";
+      document.getElementById("upload-btn").style.display = "none";
+      showMessage(err.message, "error");
+    }
+  });
+
+  const MASTER_LIST_FIELDS_UPLOAD = ["equipment_no", "equipment_name", "team", "part", "equipment_status"];
+
+  document.getElementById("upload-btn").addEventListener("click", async () => {
+    if (!parsedRows.length) return;
+    const btn = document.getElementById("upload-btn");
+    btn.disabled = true;
+    btn.textContent = "업로드 중...";
+
+    const chunkSize = 500;
+    let successCount = 0;
+    let lastError = null;
+
+    for (let i = 0; i < parsedRows.length; i += chunkSize) {
+      const chunk = parsedRows.slice(i, i + chunkSize);
+      const { error } = await supabaseClient.from("equipment_master").upsert(chunk, { onConflict: "equipment_no" });
+      if (error) {
+        lastError = error;
+        break;
+      }
+      successCount += chunk.length;
+    }
+
+    btn.disabled = false;
+    btn.textContent = "업로드 실행";
+
+    if (lastError) {
+      showMessage(`${successCount}건 처리 후 오류가 발생했습니다: ${lastError.message}`, "error");
+      return;
+    }
+
+    showMessage(`${successCount}건이 등록/갱신되었습니다.`, "success");
+    document.getElementById("paste-area").value = "";
+    document.getElementById("preview-card").style.display = "none";
+    btn.style.display = "none";
+    parsedRows = [];
+  });
+
+  (async () => {
+    const profile = await requireAdmin();
+    if (!profile) return;
+    document.getElementById("admin-link").style.display = "inline";
+    document.getElementById("user-info").textContent =
+      `${profile.name || profile.email} · ${profile.department || "-"} · ${ROLE_LABEL[profile.role]}`;
+  })();
+</script>
+</body>
+</html>
