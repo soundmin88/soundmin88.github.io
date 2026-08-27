@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>설비 상세 - 컴퓨터 시스템 통합 마스터 관리 시스템</title>
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">컴퓨터 시스템 통합 마스터 관리 시스템</div>
+  <nav>
+    <a href="dashboard.html">대시보드</a>
+    <a href="master-list.html" class="active">설비 마스터</a>
+    <a href="admin-users.html" id="admin-link" style="display:none;">사용자 관리</a>
+  </nav>
+  <div class="user-box">
+    <span id="user-info">불러오는 중...</span>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<div class="container" style="max-width: 760px;">
+  <div class="page-header">
+    <h2 id="page-title">설비 상세</h2>
+    <p><a href="master-list.html">← 목록으로</a></p>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <div class="card">
+    <form id="master-form">
+      <div class="form-grid" id="field-container"></div>
+      <div style="margin-top:20px; display:flex; gap:10px;">
+        <button type="submit" class="btn" id="save-btn" style="width:auto;">저장</button>
+        <button type="button" class="btn btn-danger" id="delete-btn" style="width:auto; display:none;">삭제</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/master-fields.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const recordId = params.get("id");
+  const fieldContainer = document.getElementById("field-container");
+  const messageBox = document.getElementById("message");
+
+  function showMessage(text, type) {
+    messageBox.textContent = text;
+    messageBox.className = "message show " + type;
+  }
+
+  function buildViewOnly(data) {
+    fieldContainer.innerHTML = MASTER_FIELDS.map((f) => `
+      <div class="field">
+        <label>${f.label}</label>
+        <div style="padding:9px 0; font-size:14px;">${data[f.key] ? escapeHtmlLocal(data[f.key]) : "<span style=\\"color:var(--color-text-muted)\\">-</span>"}</div>
+      </div>
+    `).join("");
+    document.getElementById("save-btn").style.display = "none";
+  }
+
+  function buildEditable(data) {
+    fieldContainer.innerHTML = MASTER_FIELDS.map((f) => `
+      <div class="field">
+        <label>${f.label}${f.required ? " *" : ""}</label>
+        <input type="text" data-key="${f.key}" value="${data && data[f.key] ? escapeAttr(data[f.key]) : ""}" ${f.required ? "required" : ""} />
+      </div>
+    `).join("");
+  }
+
+  function escapeHtmlLocal(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function escapeAttr(str) {
+    return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  }
+
+  function collectFormData() {
+    const inputs = fieldContainer.querySelectorAll("input[data-key]");
+    const obj = {};
+    inputs.forEach((input) => {
+      const v = input.value.trim();
+      obj[input.dataset.key] = v === "" ? null : v;
+    });
+    return obj;
+  }
+
+  (async () => {
+    const profile = await requireApprovedUser();
+    if (!profile) return;
+
+    document.getElementById("user-info").textContent =
+      `${profile.name || profile.email} · ${profile.department || "-"} · ${ROLE_LABEL[profile.role]}`;
+    if (profile.role === "admin") {
+      document.getElementById("admin-link").style.display = "inline";
+    }
+
+    const isAdmin = profile.role === "admin";
+
+    if (!recordId && !isAdmin) {
+      alert("등록 권한이 없습니다.");
+      location.href = "master-list.html";
+      return;
+    }
+
+    let existing = null;
+    if (recordId) {
+      const { data, error } = await supabaseClient.from("equipment_master").select("*").eq("id", recordId).single();
+      if (error || !data) {
+        showMessage("설비 정보를 찾을 수 없습니다.", "error");
+        document.getElementById("master-form").style.display = "none";
+        return;
+      }
+      existing = data;
+      document.getElementById("page-title").textContent = isAdmin ? "설비 수정" : `설비 상세 - ${data.equipment_name || data.equipment_no}`;
+    } else {
+      document.getElementById("page-title").textContent = "새 설비 등록";
+    }
+
+    if (isAdmin) {
+      buildEditable(existing);
+      if (existing) {
+        document.getElementById("delete-btn").style.display = "inline-flex";
+      }
+    } else {
+      buildViewOnly(existing);
+    }
+
+    document.getElementById("master-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = collectFormData();
+
+      if (!payload.equipment_no) {
+        showMessage("설비번호는 필수입니다.", "error");
+        return;
+      }
+
+      let error;
+      if (recordId) {
+        ({ error } = await supabaseClient.from("equipment_master").update(payload).eq("id", recordId));
+      } else {
+        ({ error } = await supabaseClient.from("equipment_master").insert(payload));
+      }
+
+      if (error) {
+        showMessage("저장 중 오류가 발생했습니다: " + error.message, "error");
+        return;
+      }
+
+      location.href = "master-list.html";
+    });
+
+    document.getElementById("delete-btn").addEventListener("click", async () => {
+      if (!confirm("이 설비 정보를 삭제하시겠습니까?")) return;
+      const { error } = await supabaseClient.from("equipment_master").delete().eq("id", recordId);
+      if (error) {
+        showMessage("삭제 중 오류가 발생했습니다: " + error.message, "error");
+        return;
+      }
+      location.href = "master-list.html";
+    });
+  })();
+</script>
+</body>
+</html>
